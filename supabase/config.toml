@@ -1,0 +1,7 @@
+# Supabase configuration file
+# Used by the Supabase CLI to deploy Edge Functions, run locally, etc.
+
+project_id = "food-log"
+
+[functions.parse-food]
+verify_jwt = false
