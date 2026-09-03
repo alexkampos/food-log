@@ -55,6 +55,12 @@ button {
   gap: 10px;
 }
 
+.app-version {
+  font-size: 0.7rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .api-status {
   font-size: 0.75rem;
   padding: 6px 12px;
