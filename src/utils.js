@@ -1,5 +1,17 @@
 // Helpers for displaying and computing nutrition data.
 
+// Lowercase + strip diacritics + fold final sigma. Mirrors the edge function's
+// normalization so the food_cache name_key matches on both ends.
+export function normalizeFoodName(s) {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ς/g, "σ")
+    .normalize("NFC")
+    .trim();
+}
+
 // Sum macros across all entries for a given date.
 export function computeTotals(entries = []) {
   const totals = { calories: 0, protein: 0, carbs: 0, fats: 0 };

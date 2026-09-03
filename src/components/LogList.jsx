@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { deleteEntry, updateEntry } from "../api.js";
+import { deleteEntry, updateEntry, saveFoodCache } from "../api.js";
 import { formatQuantity } from "../utils.js";
 
 const MEAL_LABELS = {
@@ -15,6 +15,8 @@ function mealLabel(m) {
 
 const SOURCE_LABEL = {
   openfoodfacts: "Open Food Facts",
+  usda: "USDA",
+  corrected: "Corrected",
   ai: "AI estimate",
   manual: "Manual",
 };
@@ -112,6 +114,14 @@ export default function LogList({ date, entries, dayLabel, onChanged }) {
   const saveEdit = async (id) => {
     try {
       await updateEntry(date, id, draft);
+      // Remember user-corrected macros so the same food parses correctly next time.
+      for (const item of draft) {
+        try {
+          await saveFoodCache(item);
+        } catch {
+          // Cache write is best-effort; never block saving the log entry.
+        }
+      }
       cancelEdit();
       onChanged();
     } catch (err) {
@@ -191,6 +201,9 @@ export default function LogList({ date, entries, dayLabel, onChanged }) {
                     <div className="entry-item" key={i}>
                       <span>
                         {item.food}
+                        {item.matchName && item.matchName !== item.food && (
+                          <span className="muted"> ({item.matchName})</span>
+                        )}
                         {formatQuantity(item) && <span className="muted"> ({formatQuantity(item)})</span>}
                       </span>
                       <span className="item-right">

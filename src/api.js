@@ -3,6 +3,7 @@
 // scoping every row to the signed-in user. There is no longer a bundled
 // Express backend.
 import { supabase, isSupabaseConfigured } from "./lib/supabase.js";
+import { normalizeFoodName } from "./utils.js";
 
 export { parseFood } from "./lib/parseFood.js";
 
@@ -80,6 +81,56 @@ export async function updateEntry(date, id, items) {
     .single();
   if (error) throw error;
   return transformRow(data);
+}
+
+// Save a user-corrected item's per-100g macros to the food_cache table so
+// future parses of the same food reuse these numbers first.
+export async function saveFoodCache(item) {
+  requireConfig();
+  if (!item || !item.food) return null;
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const userId = session?.user?.id;
+  if (!userId) return null;
+
+  // Reconstruct a per-100g value from the edited quantity + macros.
+  const q = parseFloat(item.quantity);
+  const grams =
+    !isNaN(q) && q > 0 &&
+    /^(g|gr|gram|grams|ml|kg|l|γρ|γραμμαριο|γραμμαρια)$/i.test(String(item.unit || "").trim())
+      ? q * (/^(kg|κιλο|κιλα)$/i.test(String(item.unit || "").trim()) ? 1000 : 1)
+      : null;
+
+  const per100g = { calories: 0, protein: 0, carbs: 0, fats: 0 };
+  if (grams) {
+    const f = 100 / grams;
+    per100g.calories = round1(Number(item.calories || 0) * f);
+    per100g.protein = round1(Number(item.protein || 0) * f);
+    per100g.carbs = round1(Number(item.carbs || 0) * f);
+    per100g.fats = round1(Number(item.fats || 0) * f);
+  }
+
+  const { data, error } = await supabase
+    .from("food_cache")
+    .upsert(
+      {
+        user_id: userId,
+        name_key: normalizeFoodName(item.food),
+        food: item.food,
+        brand: item.brand || item.matchName || null,
+        per100g,
+      },
+      { onConflict: "user_id,name_key" }
+    );
+
+  if (error) throw error;
+  return data;
+}
+
+function round1(v) {
+  return Math.round(v * 10) / 10;
 }
 
 // Health/status: whether Supabase is configured + a user is signed in.
